@@ -2,74 +2,78 @@ from time import sleep
 import os
 import numpy as np
 
-class Board:
+ASCII_BOCK_CODE = bytes([254]).decode('cp437')
+SLEEP_TIME = 0.2
+
+class World:
     def __init__(self, size, random=False):
         self.size_t = (size, size)
         self.stagnant = False
-        self.current_position = [0, 0]
-        self.current_neighbours = 0
+        self.old_world = np.random.randint(2, size=self.size_t) if random else np.zeros(self.size_t, dtype=int)
+        self.new_world = np.zeros(self.size_t, dtype=int)
+        self.configure_printing()
 
-        if random: 
-            self.arr_a = np.random.randint(2, size=self.size_t)
-        else:
-            self.arr_a = np.zeros(self.size_t, dtype=int)
+    def play_board(self):
+        self.create_new_generation()
+        self.is_new_same_as_old()
+        self.new_gen_to_world()
+        self.print_board()
 
-        self.arr_b = np.zeros(self.size_t, dtype=int)
-    
-    def progress_board(self):
-        if np.array_equal(self.arr_a, self.arr_b): self.stagnant = True
-        self.arr_a = self.arr_b
-        self.arr_b = np.zeros(self.size_t, dtype=int)
+    def create_new_generation(self):
+        row_len, col_len = self.old_world.shape
+        for row in range(row_len):
+            for col in range(col_len):
+                    position = [row, col]
+                    neighbours = self.count_neighbours(position)
+                    self.determine_fate(position, neighbours)
 
-    def determine_fate(self):
-        row, col = self.current_position
-        n = self.current_neighbours
-        if (self.arr_a[row][col] == 1 and n == 2 or 
-            self.arr_a[row][col] == 1 and n == 3 or 
-            self.arr_a[row][col] == 0 and n == 3): return 1
-        else: return 0
-
-    def count_neighbours(self):
-        row_len, col_len = self.arr_a.shape
-        row, col = self.current_position
-
-        self.current_neighbours = 0
+    def count_neighbours(self, position):
+        row_len, col_len = self.old_world.shape
+        row, col = position
+        current_neighbours = 0
         for row_n in range(row-1, row+2):
             for col_n in range(col-1, col+2):
                 if(0 <= row_n < row_len and 
                     0 <= col_n < col_len and
                     [row_n, col_n] != [row, col]):
-                        self.current_neighbours += self.arr_a[row_n][col_n]
+                        current_neighbours += self.old_world[row_n][col_n]
 
-        return self.determine_fate()
+        return current_neighbours
+    
+    def determine_fate(self,position, neighbours):
+        row, col = position
+        n = neighbours
+        if (self.old_world[row][col] == 1 and n == 2 or 
+            self.old_world[row][col] == 1 and n == 3 or 
+            self.old_world[row][col] == 0 and n == 3): 
+            self.new_world[row][col] = 1
+        else: 
+            self.new_world[row][col] = 0
 
-    def iterate_board(self):
-        row_len, col_len = self.arr_a.shape
-        for row in range(row_len):
-            for col in range(col_len):
-                    self.current_position = [row, col]
-                    self.arr_b[row][col] = self.count_neighbours()
+    def new_gen_to_world(self):
+        self.old_world = self.new_world
+        self.new_world = np.zeros(self.size_t, dtype=int)
 
-    def play_board(self):
-        self.iterate_board()
-        self.progress_board()
-        self.print_board()
+    def configure_printing(self):
+        fmt = {'int': lambda i: '\033[{}m{}\033[0m'.format(1 if i else 8, ASCII_BOCK_CODE)}
+        np.set_printoptions(formatter=fmt, linewidth=1000)
 
     def print_board(self):
-        os.system('cls')
-        fmt = {'int': lambda i: '\x1b[{}m{}\x1b[0m'.format(1 if i else 8, b'\xfe'.decode('cp437'))} 
-        np.set_printoptions(formatter=fmt, linewidth=1000)
-        print(self.arr_a)
+        os.system('clear')
+        print(self.old_world)
 
-    def empty_board(self):
-        return np.all(self.arr_a == 0)
+    def is_new_same_as_old(self):
+        if np.array_equal(self.old_world, self.new_world): self.stagnant = True
 
-    def stagnant_board(self):
+    def is_empty(self):
+        return np.all(self.old_world == 0)
+
+    def is_stagnant(self):
         return self.stagnant
 
-board = Board(30, random=True)
+world = World(30, random=True)
 
-while(not board.empty_board() and not board.stagnant_board()):
-    board.play_board()
-    sleep(0.2)
+while(not world.is_empty() and not world.is_stagnant()):
+    world.play_board()
+    sleep(SLEEP_TIME)
     
